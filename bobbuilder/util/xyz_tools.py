@@ -1,3 +1,5 @@
+import numpy as np
+
 def build_xyz_file(elements, coordinates):
     elements = elements.reshape(-1,1)
     coordinates = coordinates.reshape(-1,3)

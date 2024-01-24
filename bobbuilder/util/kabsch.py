@@ -1,3 +1,5 @@
+import numpy as np
+
 def kabsch_algorithm(coords1, coords2, center=True):
     """
     Perform the Kabsch algorithm to find the optimal rotation matrix.
