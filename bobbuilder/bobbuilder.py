@@ -54,6 +54,7 @@ RotatableBond = Chem.MolFromSmarts('[!$(*#*)&!D1]-&!@[!$(*#*)&!D1]')
 # TODO: Make all decorations work sequentially (depends on fixed core numbering)
 for decoration in input_data['decorations'][0:1]:
     for core_replace_atom in decoration['replace at']:
+        print(f"Running decoration {decoration} replacing at {core_replace_atom}")
         fragment_file = decoration['fragment']
         fragment_connection_atom = decoration['connecting atoms']
         connection_axis = decoration['bond axis atoms']
@@ -230,10 +231,13 @@ for decoration in input_data['decorations'][0:1]:
         print(original_atom_numbers)
         print(updated_atom_numbers)
         _ = reorder_xyz(joint_coordinates, updated_atom_numbers, original_atom_numbers)
-        elements_join = _[:,0]
-        best_coordinates = _[:,1:]
+        # elements_join = _[:,0]
+        # best_coordinates = _[:,1:]
 
+        core_elements = _[:,0].reshape(-1).astype(np.str_)
+        core_coordinates = _[:,1:].astype(float)
+        core_adj_matrix = morfeus.utils.get_connectivity_matrix(core_coordinates,core_elements)
 
-        xyz_file = build_xyz_file(elements_join, best_coordinates)
-        with open('rotation.xyz', mode='w') as f:
-            f.write(xyz_file)
+xyz_file = build_xyz_file(core_elements, core_coordinates)
+with open('rotation.xyz', mode='w') as f:
+    f.write(xyz_file)
