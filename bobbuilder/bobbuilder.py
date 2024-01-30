@@ -39,7 +39,7 @@ for decoration in input_data['decorations']:
     for key in ['replace at', 'connecting atoms', 'bond axis atoms']:
         decoration[key] = np.array(decoration[key]) - 1
 
-# prepare core stuff
+# core details
 core_file = input_data['core']
 core_atoms = input_data['core atoms']
 
@@ -70,19 +70,22 @@ for decoration in input_data['decorations'][0:1]:
         # check if core is a terminal-type replacement
         # if not, remove all neighbours of the replacement point (except for core and core-neighbours)
         core_neighbours = np.array(find_neighbors(core_adj_matrix, core_replace_atom, excluded_atoms=core_atoms))
-        if len(core_neighbours) > 1:
-            core_neighbours = np.delete(core_neighbours, np.where(core_neighbours == core_replace_atom))
+        core_neighbours = np.delete(core_neighbours, np.where(core_neighbours == core_replace_atom))
+
+        if len(core_neighbours) > 0:
             core_replace_atom_ = core_replace_atom.copy()
             core_replace_atom -= len(np.where(core_neighbours < core_replace_atom)[0])
+
             core_atoms_ = core_atoms.copy()
             for i,atom in enumerate(core_atoms_):
                 core_atoms_[i] -= len(np.where(core_neighbours < atom)[0])
+
             core_coordinates_ = np.delete(core_coordinates, core_neighbours, axis=0)
             core_elements_ = np.delete(core_elements, core_neighbours, axis=0)
             core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_elements_)
         else:
-            core_atoms_ = core_atoms.copy()
             core_replace_atom_ = core_replace_atom.copy()
+            core_atoms_ = core_atoms.copy()
             core_coordinates_ = core_coordinates.copy()
             core_elements_ = core_elements.copy()
             core_adj_matrix_ = core_adj_matrix.copy()
@@ -111,16 +114,16 @@ for decoration in input_data['decorations'][0:1]:
             fragment_elements_ = fragment_elements.copy()
 
             # translate core to origin
-            core_translation = core_coordinates_[core_replace_atom].copy()
-            core_coordinates_2 = core_coordinates_.copy()
-            core_coordinates_2 -= core_translation
+            core_translation = core_coordinates_[core_replace_atom_].copy()
+            _core_coordinates = core_coordinates_.copy()
+            _core_coordinates -= core_translation
 
             # translate fragment to origin
             fragment_coordinates_ -= fragment_coordinates_[fragment_connection_atom]
 
             #identify the core-axis
             axis_point2_atom = np.where(core_adj_matrix[core_replace_atom] == 1)[0][0]
-            core_axis = core_coordinates_2[core_replace_atom] - core_coordinates_2[axis_point2_atom]
+            core_axis = _core_coordinates[core_replace_atom] - _core_coordinates[axis_point2_atom]
 
             # set fragment axis coordinates
             # len(axis) = 1, take the coordinates of this atom
@@ -141,9 +144,9 @@ for decoration in input_data['decorations'][0:1]:
             fragment_coordinates_ = (R @ fragment_coordinates_.T).T
 
             # remove the core atom
-            core_coordinates_2 = np.delete(core_coordinates_2, core_replace_atom, axis=0)
-            core_elements_2 = np.delete(core_elements_, core_replace_atom)
-            elements_join = np.concatenate([core_elements_2, fragment_elements_])
+            _core_coordinates = np.delete(_core_coordinates, core_replace_atom, axis=0)
+            _core_elements = np.delete(core_elements_, core_replace_atom)
+            elements_join = np.concatenate([_core_elements, fragment_elements_])
 
             # rotate the fragment 360 degrees about the fragment axis
             # find the optimal positioning for the rigid fragment
@@ -157,7 +160,7 @@ for decoration in input_data['decorations'][0:1]:
                     new_coordinates = qv_mult(quat, tuple(atom_coordinates))
                     fragment_coordinates_[i] = new_coordinates
 
-                coordinates_join = np.vstack([core_coordinates_2, fragment_coordinates_])
+                coordinates_join = np.vstack([_core_coordinates, fragment_coordinates_])
                 distances = pdist(coordinates_join, 'euclidean')
                 if (distances > .990).all():
                     coordinates_all.append(coordinates_join)
@@ -165,9 +168,9 @@ for decoration in input_data['decorations'][0:1]:
                     continue
 
                 intersection_volumes = sphere_intersection_volumes(
-                    core_coordinates_2,
+                    _core_coordinates,
                     fragment_coordinates_,
-                    radii_a=[periodic_table['vdw radii'][i] for i in core_elements_2],
+                    radii_a=[periodic_table['vdw radii'][i] for i in _core_elements],
                     radii_b =[periodic_table['vdw radii'][i] for i in fragment_elements_]
                 )
                 intersection_volume = np.array(intersection_volumes).sum()
@@ -217,16 +220,19 @@ for decoration in input_data['decorations'][0:1]:
         # dest numbers are the initial core numbering
         # source numbering has to be a match of each core number except for the one that was substituted (this comes for free)
 
-        print(best_coordinates)
-        print(elements_join)
+        original_atom_numbers = core_atoms_
+        updated_atom_numbers = []
+        for atom_idx in original_atom_numbers:
+            atom_coords = core_coordinates_[atom_idx].round(4)
+            atom_idx_updated = np.where(np.all(best_coordinates.round(4) == atom_coords, axis=1))[0][0]
+            updated_atom_numbers.append(atom_idx_updated)
+        
+        print(original_atom_numbers)
+        print(updated_atom_numbers)
+        _ = reorder_xyz(joint_coordinates, updated_atom_numbers, original_atom_numbers)
+        elements_join = _[:,0]
+        best_coordinates = _[:,1:]
 
-        for atom_idx_tmp in input_data['core atoms']:
-            print(atom_idx_tmp)
-            _coords = core_coordinates_[atom_idx_tmp]
-            _coords = _coords.round(4)
-            print(_coords)
-            print(np.where(np.all(best_coordinates.round(4) == _coords, axis=1)))
-            print()
 
         xyz_file = build_xyz_file(elements_join, best_coordinates)
         with open('rotation.xyz', mode='w') as f:
