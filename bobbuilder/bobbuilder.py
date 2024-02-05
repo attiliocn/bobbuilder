@@ -89,7 +89,7 @@ for decoration in input_data['decorations']:
 
         if len(core_neighbours) > 0:
             core_replace_atom_ = core_replace_atom.copy()
-            core_replace_atom -= len(np.where(core_neighbours < core_replace_atom)[0])
+            core_replace_atom_ -= len(np.where(core_neighbours < core_replace_atom_)[0])
 
             for i,atom in enumerate(core_atoms_):
                 core_atoms_[i] -= len(np.where(core_neighbours < atom)[0])
@@ -97,9 +97,6 @@ for decoration in input_data['decorations']:
             core_coordinates_ = np.delete(core_coordinates_, core_neighbours, axis=0)
             core_elements_ = np.delete(core_elements_, core_neighbours, axis=0)
             core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_elements_)
-
-            # you need to renumber core atoms after this procedure
-
         else:
             core_replace_atom_ = core_replace_atom.copy()
             core_coordinates_ = core_coordinates_.copy()
@@ -109,6 +106,8 @@ for decoration in input_data['decorations']:
             xyz_file = build_xyz_file(core_elements_, core_coordinates_)
             with open(f'd{decoration_i}rep{replacement_i}-1.xyz', mode='w') as f:
                 f.write(xyz_file)
+            print(f"Core atoms: {core_atoms_+1}")
+            print(f"Replace at: {core_replace_atom_+1}")
 
         # remove fragment hydrogens or side chain as per user request
         def remove_sidechain(arg):
@@ -142,8 +141,8 @@ for decoration in input_data['decorations']:
             fragment_coordinates_ -= fragment_coordinates_[fragment_connection_atom]
 
             #identify the core-axis
-            axis_point2_atom = np.where(core_adj_matrix_[core_replace_atom] == 1)[0][0]
-            core_axis = _core_coordinates[core_replace_atom] - _core_coordinates[axis_point2_atom]
+            axis_point2_atom = np.where(core_adj_matrix_[core_replace_atom_] == 1)[0][0]
+            core_axis = _core_coordinates[core_replace_atom_] - _core_coordinates[axis_point2_atom]
 
             # set fragment axis coordinates
             # len(axis) = 1, take the coordinates of this atom
@@ -164,8 +163,8 @@ for decoration in input_data['decorations']:
             fragment_coordinates_ = (R @ fragment_coordinates_.T).T
 
             # remove the core atom
-            _core_coordinates = np.delete(_core_coordinates, core_replace_atom, axis=0)
-            _core_elements = np.delete(core_elements_, core_replace_atom)
+            _core_coordinates = np.delete(_core_coordinates, core_replace_atom_, axis=0)
+            _core_elements = np.delete(core_elements_, core_replace_atom_)
             elements_join = np.concatenate([_core_elements, fragment_elements_])
 
             # rotate the fragment 360 degrees about the fragment axis
@@ -241,14 +240,7 @@ for decoration in input_data['decorations']:
             
             return modified_matrix
         
-        _ = reorder_xyz(joint_coordinates, [44-1,43-1,46-1,], [2-1,3-1,4-1])
-        # elements_join = _[:,0]
-        # best_coordinates = _[:,1:]
-
-        # dest numbers are the initial core numbering
-        # source numbering has to be a match of each core number except for the one that was substituted (this comes for free)
-
-        original_atom_numbers = core_atoms_
+        original_atom_numbers = core_atoms
         updated_atom_numbers = []
         for atom_idx in original_atom_numbers:
             atom_coords = core_coordinates_[atom_idx].round(4)
@@ -271,6 +263,6 @@ for decoration in input_data['decorations']:
         replacement_i += 1
     decoration_i += 1
 
-# xyz_file = build_xyz_file(core_elements, core_coordinates)
-# with open('rotation.xyz', mode='w') as f:
-#     f.write(xyz_file)
+xyz_file = build_xyz_file(core_elements_, core_coordinates_)
+with open('rotation.xyz', mode='w') as f:
+    f.write(xyz_file)
