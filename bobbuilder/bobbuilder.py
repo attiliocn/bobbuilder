@@ -240,25 +240,33 @@ for decoration in input_data['decorations']:
             
             return modified_matrix
         
-        original_atom_numbers = core_atoms
+        fixed_core = np.array([i for i in range(len(core_atoms))])
+        original_atom_numbers = core_atoms_.copy()
         updated_atom_numbers = []
         for atom_idx in original_atom_numbers:
             atom_coords = core_coordinates_[atom_idx].round(4)
             atom_idx_updated = np.where(np.all(best_coordinates.round(4) == atom_coords, axis=1))[0][0]
             updated_atom_numbers.append(atom_idx_updated)
 
-        _ = reorder_xyz(joint_coordinates, updated_atom_numbers, original_atom_numbers)
+        if args.verbose:
+            print("Running matrix reordering")
+            print(f"Current numbering {updated_atom_numbers}")
+            print(f"New numbering {fixed_core}")
+        
+        _ = reorder_xyz(joint_coordinates, updated_atom_numbers, fixed_core)
         # elements_join = _[:,0]
         # best_coordinates = _[:,1:]
 
         core_elements_ = _[:,0].reshape(-1).astype(np.str_)
         core_coordinates_ = _[:,1:].astype(float)
         core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates,core_elements)
+        core_atoms_ = fixed_core
 
         if args.verbose:
             xyz_file = build_xyz_file(core_elements_, core_coordinates_)
             with open(f'd{decoration_i}rep{replacement_i}-2.xyz', mode='w') as f:
                 f.write(xyz_file)
+            print("")
 
         replacement_i += 1
     decoration_i += 1
