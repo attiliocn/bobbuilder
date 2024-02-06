@@ -94,9 +94,6 @@ for decoration in input_data['decorations']:
         # check if core is a terminal-type replacement
         # if not, remove all neighbours of the replacement point (except for core and core-neighbours)
 
-        # TODO: Keep track of any decoration coordinates, then exclude them
-        # from the neighbours search to avoid deletind portions of the decoration added in
-        # previous rounds
         core_neighbours = np.array(find_neighbors(core_adj_matrix_, core_replace_atom_, excluded_atoms=core_atoms_))
         core_neighbours = np.delete(core_neighbours, np.where(core_neighbours == core_replace_atom_))
 
@@ -111,7 +108,6 @@ for decoration in input_data['decorations']:
 
             core_coordinates_ = np.delete(core_coordinates_, core_neighbours, axis=0)
             core_elements_ = np.delete(core_elements_, core_neighbours, axis=0)
-            core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_elements_)
 
         if args.verbose:
             xyz_file = build_xyz_file(core_elements_, core_coordinates_)
@@ -223,7 +219,6 @@ for decoration in input_data['decorations']:
         # update core coordinates for the next decoration cycle
         core_elements_ = elements_join
         core_coordinates_ = best_coordinates
-        core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates,core_elements)
 
         # identify current core atom numbers
         # then remap core to 1,...,n atom numbers again
@@ -245,7 +240,6 @@ for decoration in input_data['decorations']:
         core_atoms_ = fixed_core
         core_elements_ = _[:,0].reshape(-1).astype(np.str_)
         core_coordinates_ = _[:,1:].astype(float)
-        core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_elements_)
 
         if args.verbose:
             print(f"The core has been renumbered.\nCurrent core atom numbers:{core_atoms_}")
