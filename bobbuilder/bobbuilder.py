@@ -21,7 +21,6 @@ __location__ = os.path.realpath(
 parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--input', type=str, help='Standard JSON input for BobBuilder')
 parser.add_argument('-v', '--verbose', action='store_true', help='Increase verbosity level')
-# TODO -> include "reset-core" option to reset core number to 1-->n at the end of the loop (default: keep numbering)
 # TODO -> include an option to write a template of the input file then exit
 args = parser.parse_args()
 
@@ -64,6 +63,7 @@ core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_
 # main engine
 decoration_i = 0
 for decoration in input_data['decorations']:
+
     replacement_i = 0
     for core_replace_atom in decoration['replace at']:
 
@@ -78,22 +78,8 @@ for decoration in input_data['decorations']:
             with open(f'd{decoration_i}rep{replacement_i}-0.xyz', mode='w') as f:
                 f.write(xyz_file)
 
-        fragment_file = decoration['fragment']
-        fragment_connection_atom = decoration['connecting atoms']
-        connection_axis = decoration['bond axis atoms']
-
-        fragment_elements, fragment_coordinates = morfeus.read_xyz(fragment_file)
-        fragment_adj_matrix = morfeus.utils.get_connectivity_matrix(fragment_coordinates,fragment_elements)
-
-        fragment_mol = Chem.rdmolfiles.MolFromXYZFile(fragment_file)
-        rdDetermineBonds.DetermineConnectivity(fragment_mol)
-        rdDetermineBonds.DetermineBondOrders(fragment_mol, charge=0)
-        
-        rotatable_bonds = fragment_mol.GetSubstructMatches(RotatableBond)
-
         # check if core is a terminal-type replacement
         # if not, remove all neighbours of the replacement point (except for core and core-neighbours)
-
         core_neighbours = np.array(find_neighbors(core_adj_matrix_, core_replace_atom_, excluded_atoms=core_atoms_))
         core_neighbours = np.delete(core_neighbours, np.where(core_neighbours == core_replace_atom_))
 
@@ -116,9 +102,44 @@ for decoration in input_data['decorations']:
             print(f"Core atoms: {core_atoms_+1}")
             print(f"Replace at: {core_replace_atom_+1}")
 
-        # remove fragment hydrogens or side chain as per user request
-        def remove_sidechain(arg):
-            pass
+        # read fragment data
+        fragment_file = decoration['fragment']
+        fragment_connection_atom = decoration['connecting atoms']
+        connection_axis = decoration['bond axis atoms']
+
+        fragment_elements, fragment_coordinates = morfeus.read_xyz(fragment_file)
+        fragment_adj_matrix = morfeus.utils.get_connectivity_matrix(fragment_coordinates,fragment_elements)
+
+        fragment_mol = Chem.rdmolfiles.MolFromXYZFile(fragment_file)
+        rdDetermineBonds.DetermineConnectivity(fragment_mol)
+        rdDetermineBonds.DetermineBondOrders(fragment_mol, charge=0)
+        
+        rotatable_bonds = fragment_mol.GetSubstructMatches(RotatableBond)
+
+        # deprotonate fragment
+        if decoration['deprotonate'] == True:
+            if args.verbose:
+                print("Fragment will be deprotonated")
+
+            for i, atom in enumerate(fragment_connection_atom):
+                if fragment_elements[atom] in ['C', 'O', 'N', 'S']:
+                    fragment_neighbours = np.array(find_neighbors(fragment_adj_matrix, atom, excluded_atoms=connection_axis))
+                    fragment_neighbours = np.delete(fragment_neighbours, np.where(fragment_neighbours == atom))
+                    
+                    if args.verbose:
+                        print(f"Current neighbours of atom {atom+1}: {fragment_neighbours+1}")
+
+                    for neighbour in fragment_neighbours:
+                        if fragment_elements[neighbour] == 'H':
+                            if args.verbose:
+                                print(f"Neighbour {neighbour+1} of atom {atom+1} will be deleted")
+                            fragment_coordinates = np.delete(fragment_coordinates, neighbour, axis=0)
+                            fragment_elements = np.delete(fragment_elements, neighbour, axis=0)
+                            fragment_adj_matrix = morfeus.utils.get_connectivity_matrix(fragment_coordinates,fragment_elements)
+                            if neighbour < atom:
+                                fragment_connection_atom[i] -= 1
+                                connection_axis -= 1
+                            break
 
         coordinates_all = []
         intersection_volume_all = []
