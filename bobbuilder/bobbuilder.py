@@ -11,7 +11,7 @@ from scipy.spatial.distance import pdist
 
 from util.geometry import rotate_dihedral
 from util.graph_tools import find_neighbors
-from util.xyz_tools import build_xyz_file
+from util.xyz_tools import build_xyz_file, reorder_xyz
 from util.kabsch import kabsch_algorithm
 from util.geometry import axisangle_to_q, qv_mult, sphere_intersection_volumes
 
@@ -42,29 +42,38 @@ for decoration in input_data['decorations']:
 # core details
 core_file = input_data['core']
 core_atoms = input_data['core atoms']
-
 core_elements, core_coordinates = morfeus.read_xyz(core_file)
-#core_adj_matrix = morfeus.utils.get_connectivity_matrix(core_coordinates,core_elements)
-
 core_mol = Chem.rdmolfiles.MolFromXYZFile(core_file)
 rdDetermineBonds.DetermineConnectivity(core_mol)
 
+# rdkit smarts pattern for rotatable bondss
 RotatableBond = Chem.MolFromSmarts('[!$(*#*)&!D1]-&!@[!$(*#*)&!D1]')
 
+# remap core to 1,...,n atom numbers
+fixed_core = np.array([i for i in range(len(core_atoms))])
+_ = reorder_xyz(
+    np.concatenate([core_elements.reshape(-1,1), core_coordinates.reshape(-1,3)], axis=1),
+    core_atoms,
+    fixed_core,
+)
+core_atoms_ = fixed_core
+core_elements_ = _[:,0].reshape(-1).astype(np.str_)
+core_coordinates_ = _[:,1:].astype(float)
+core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_elements_)
+
+# main engine
 decoration_i = 0
 for decoration in input_data['decorations']:
-
-    if decoration_i == 0:
-        core_atoms_ = core_atoms.copy()
-        core_elements_ = core_elements.copy()
-        core_coordinates_ = core_coordinates.copy()
-        core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_elements_)
-    
     replacement_i = 0
     for core_replace_atom in decoration['replace at']:
 
+        # map current core_replace_atom to the actual core atom number
+        core_replace_atom_coords = core_coordinates[core_replace_atom].round(4)
+        core_replace_atom_ = np.where(np.all(core_coordinates_.round(4) == core_replace_atom_coords, axis=1))[0][0]
+
         if args.verbose:
-            print(f"Running decoration {decoration_i} replacing No {replacement_i}")
+            print(f"Running Decoration Nº {decoration_i}.{replacement_i}")
+            print(f"Original core atom number: {core_replace_atom+1}, Updated core atom number: {core_replace_atom_+1}")
             xyz_file = build_xyz_file(core_elements_, core_coordinates_)
             with open(f'd{decoration_i}rep{replacement_i}-0.xyz', mode='w') as f:
                 f.write(xyz_file)
@@ -84,11 +93,17 @@ for decoration in input_data['decorations']:
 
         # check if core is a terminal-type replacement
         # if not, remove all neighbours of the replacement point (except for core and core-neighbours)
-        core_neighbours = np.array(find_neighbors(core_adj_matrix_, core_replace_atom, excluded_atoms=core_atoms_))
-        core_neighbours = np.delete(core_neighbours, np.where(core_neighbours == core_replace_atom))
+
+        # TODO: Keep track of any decoration coordinates, then exclude them
+        # from the neighbours search to avoid deletind portions of the decoration added in
+        # previous rounds
+        core_neighbours = np.array(find_neighbors(core_adj_matrix_, core_replace_atom_, excluded_atoms=core_atoms_))
+        core_neighbours = np.delete(core_neighbours, np.where(core_neighbours == core_replace_atom_))
 
         if len(core_neighbours) > 0:
-            core_replace_atom_ = core_replace_atom.copy()
+            if args.verbose:
+                print('Neighbours to the connection point will be removed')
+
             core_replace_atom_ -= len(np.where(core_neighbours < core_replace_atom_)[0])
 
             for i,atom in enumerate(core_atoms_):
@@ -97,10 +112,6 @@ for decoration in input_data['decorations']:
             core_coordinates_ = np.delete(core_coordinates_, core_neighbours, axis=0)
             core_elements_ = np.delete(core_elements_, core_neighbours, axis=0)
             core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_elements_)
-        else:
-            core_replace_atom_ = core_replace_atom.copy()
-            core_coordinates_ = core_coordinates_.copy()
-            core_elements_ = core_elements_.copy()
 
         if args.verbose:
             xyz_file = build_xyz_file(core_elements_, core_coordinates_)
@@ -208,66 +219,42 @@ for decoration in input_data['decorations']:
 
         best_coordinates = coordinates_all[optimal_rotation]
         best_coordinates += core_translation
-
-        # rewrite best coordinates + elements, conserving the core numbering scheme
-        # rplt atom coordinates number = core that it replaced number
-        # other core atoms -> some correspondence is needed
-
-        joint_coordinates = np.concatenate([elements_join.reshape(-1,1), best_coordinates.reshape(-1,3)], axis=1)
         
-        def reorder_xyz(xyz_matrix, src_numbering, dest_numbering):
-            n_atoms = len(xyz_matrix)
-            modified_matrix = np.zeros(n_atoms*4).reshape(n_atoms,4)
-            modified_matrix = modified_matrix.astype(xyz_matrix.dtype)
+        # update core coordinates for the next decoration cycle
+        core_elements_ = elements_join
+        core_coordinates_ = best_coordinates
+        core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates,core_elements)
 
-            unmodified_in_source = []
-            for i in range(n_atoms):
-                if i not in src_numbering:
-                    unmodified_in_source.append(i)
-            unmodified_in_source = np.array(unmodified_in_source)
-            
-            empty_in_destination = []
-            for i in range(n_atoms):
-                if i not in dest_numbering:
-                    empty_in_destination.append(i)
-            empty_in_destination = np.array(empty_in_destination)
-
-            for src, dest in zip(unmodified_in_source, empty_in_destination):
-                modified_matrix[dest] = xyz_matrix[src]
-
-            for src, dest in zip(src_numbering, dest_numbering):
-                modified_matrix[dest] = xyz_matrix[src]
-            
-            return modified_matrix
+        # identify current core atom numbers
+        # then remap core to 1,...,n atom numbers again
+        current_core_atoms = []
+        for atom_idx in core_atoms:
+            atom_coords = core_coordinates[atom_idx].round(4)
+            atom_idx_updated = np.where(np.all(core_coordinates_.round(4) == atom_coords, axis=1))[0][0]
+            current_core_atoms.append(atom_idx_updated)
+        current_core_atoms = np.array(current_core_atoms)
         
-        fixed_core = np.array([i for i in range(len(core_atoms))])
-        original_atom_numbers = core_atoms_.copy()
-        updated_atom_numbers = []
-        for atom_idx in original_atom_numbers:
-            atom_coords = core_coordinates_[atom_idx].round(4)
-            atom_idx_updated = np.where(np.all(best_coordinates.round(4) == atom_coords, axis=1))[0][0]
-            updated_atom_numbers.append(atom_idx_updated)
-
         if args.verbose:
-            print("Running matrix reordering")
-            print(f"Current numbering {updated_atom_numbers}")
-            print(f"New numbering {fixed_core}")
-        
-        _ = reorder_xyz(joint_coordinates, updated_atom_numbers, fixed_core)
-        # elements_join = _[:,0]
-        # best_coordinates = _[:,1:]
-
+            print(f"Current core atom numbers: {current_core_atoms+1}")
+    
+        _ = reorder_xyz(
+            np.concatenate([core_elements_.reshape(-1,1), core_coordinates_.reshape(-1,3)], axis=1),
+            current_core_atoms,
+            fixed_core,
+        )
+        core_atoms_ = fixed_core
         core_elements_ = _[:,0].reshape(-1).astype(np.str_)
         core_coordinates_ = _[:,1:].astype(float)
-        core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates,core_elements)
-        core_atoms_ = fixed_core
+        core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_elements_)
+
+        if args.verbose:
+            print(f"The core has been renumbered.\nCurrent core atom numbers:{core_atoms_}")
 
         if args.verbose:
             xyz_file = build_xyz_file(core_elements_, core_coordinates_)
             with open(f'd{decoration_i}rep{replacement_i}-2.xyz', mode='w') as f:
                 f.write(xyz_file)
-            print("")
-
+            print("Decoration done\n\n")
         replacement_i += 1
     decoration_i += 1
 
