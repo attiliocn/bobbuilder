@@ -136,9 +136,13 @@ for decoration in input_data['decorations']:
                             fragment_coordinates = np.delete(fragment_coordinates, neighbour, axis=0)
                             fragment_elements = np.delete(fragment_elements, neighbour, axis=0)
                             fragment_adj_matrix = morfeus.utils.get_connectivity_matrix(fragment_coordinates,fragment_elements)
-                            if neighbour < atom:
+                            if atom > neighbour:
                                 fragment_connection_atom[i] -= 1
                                 connection_axis -= 1
+                            # TODO: Increase the efficiency of this implementation!
+                            rotatable_bonds_ = np.array(rotatable_bonds)
+                            rotatable_bonds_[rotatable_bonds_ > neighbour] -= 1
+                            rotatable_bonds = rotatable_bonds_
                             break
 
         coordinates_all = []
