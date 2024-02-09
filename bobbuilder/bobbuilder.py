@@ -144,6 +144,28 @@ for decoration in input_data['decorations']:
                             rotatable_bonds_[rotatable_bonds_ > neighbour] -= 1
                             rotatable_bonds = rotatable_bonds_
                             break
+        elif decoration['make terminal'] == True:
+            for i, atom in enumerate(fragment_connection_atom):
+                if fragment_elements[atom] in ['C', 'O', 'N', 'S']:
+                    fragment_neighbours = np.array(find_neighbors(fragment_adj_matrix, atom, excluded_atoms=connection_axis))
+                    fragment_neighbours = np.delete(fragment_neighbours, np.where(fragment_neighbours == atom))
+                    
+                    if args.verbose:
+                        print("Running the MAKE_TERMINAL routine")
+                        print(f"Current neighbours of atom {atom+1}: {fragment_neighbours+1}")
+
+                    for neighbour in fragment_neighbours:
+                        if args.verbose:
+                            print(f"Neighbour {neighbour+1} of atom {atom+1} will be deleted")
+                        fragment_coordinates = np.delete(fragment_coordinates, neighbour, axis=0)
+                        fragment_elements = np.delete(fragment_elements, neighbour, axis=0)
+                        fragment_adj_matrix = morfeus.utils.get_connectivity_matrix(fragment_coordinates,fragment_elements)
+                        if atom > neighbour:
+                            fragment_connection_atom[i] -= 1
+                            connection_axis -= 1
+                        rotatable_bonds_ = np.array(rotatable_bonds)
+                        rotatable_bonds_[rotatable_bonds_ > neighbour] -= 1
+                        rotatable_bonds = rotatable_bonds_
 
         coordinates_all = []
         intersection_volume_all = []
@@ -218,8 +240,9 @@ for decoration in input_data['decorations']:
                 #     xyz_file = build_xyz_file(elements_join, coordinates_join)
                 #     with open(f'd{decoration_i}r{replacement_i}_rotations.xyz', mode='a') as f:
                 #         f.write(xyz_file)
+                #     print(f"{rotation} {distances.min()}")
 
-                if (distances > .990).all():
+                if (distances > .950).all():
                     coordinates_all.append(coordinates_join)
                 else:
                     continue
