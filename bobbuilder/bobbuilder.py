@@ -187,6 +187,11 @@ for decoration in input_data['decorations']:
             fragment_coordinates_ = frag_conf_coordinates.copy()
             fragment_elements_ = fragment_elements.copy()
 
+            if args.verbose:
+                xyz_file = build_xyz_file(fragment_elements_, fragment_coordinates_)
+                with open(f'd{decoration_i}r{replacement_i}_confs.xyz', mode='a') as f:
+                    f.write(xyz_file)
+
             # translate core to origin
             core_translation = core_coordinates_[core_replace_atom_].copy()
             _core_coordinates = core_coordinates_.copy()
