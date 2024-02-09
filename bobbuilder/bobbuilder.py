@@ -180,8 +180,11 @@ for decoration in input_data['decorations']:
             for bond, angle in zip(rotatable_bonds, rotation_angles):
                 rot = rotate_dihedral(bond[0], bond[1], rot, fragment_adj_matrix, angle)
             distances = pdist(rot, 'euclidean')
-            if (distances > .990).all():
-                fragment_conformers.append(rot) 
+            if (distances > .950).all():
+                fragment_conformers.append(rot)
+
+        if args.verbose:
+            print(f"Total conformers to be tested: {len(fragment_conformers)}")
 
         for frag_conf_coordinates in fragment_conformers:
             fragment_coordinates_ = frag_conf_coordinates.copy()
