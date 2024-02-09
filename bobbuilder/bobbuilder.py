@@ -86,6 +86,7 @@ for decoration in input_data['decorations']:
         if len(core_neighbours) > 0:
             if args.verbose:
                 print('Neighbours to the connection point will be removed')
+                print(f"Removing atoms {core_neighbours+1}")
 
             core_replace_atom_ -= len(np.where(core_neighbours < core_replace_atom_)[0])
 
@@ -288,6 +289,8 @@ for decoration in input_data['decorations']:
         core_atoms_ = fixed_core
         core_elements_ = _[:,0].reshape(-1).astype(np.str_)
         core_coordinates_ = _[:,1:].astype(float)
+        core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_elements_)
+        #TODO -> keep track of the added ligand coordinates to exclude them from the core neighbours search
 
         if args.verbose:
             print(f"The core has been renumbered.\nCurrent core atom numbers:{core_atoms_}")
