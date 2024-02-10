@@ -55,6 +55,8 @@ _ = reorder_xyz(
     core_atoms,
     fixed_core,
 )
+if args.verbose:
+    print(f"Core atoms were renumbered\nOriginal core numbers: {core_atoms+1}\nCurrent core numbers:{fixed_core+1}\n")
 core_atoms_ = fixed_core
 core_elements_ = _[:,0].reshape(-1).astype(np.str_)
 core_coordinates_ = _[:,1:].astype(float)
@@ -62,11 +64,22 @@ core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_
 
 # main engine
 decoration_i = 0
-added_fragments_coordinates = np.array([])
+added_fragments_coordinates = np.array([[],[],[]]).reshape(-1,3)
+added_fragments_atom_numbers = np.array([])
 for decoration in input_data['decorations']:
 
     replacement_i = 0
     for core_replace_atom in decoration['replace at']:
+
+        # map added coordinates to actual atom numbers
+        for coordinate in added_fragments_coordinates:
+            atom_number = np.where(np.all(core_coordinates_.round(4) == coordinate, axis=1))[0][0]
+            added_fragments_atom_numbers = np.append(added_fragments_atom_numbers, atom_number)
+
+        if args.verbose:
+            print(f"New atoms added at positions: {added_fragments_atom_numbers+1}\n")
+
+        ignore_atoms_ = np.append(core_atoms_, added_fragments_atom_numbers)
 
         # map current core_replace_atom to the actual core atom number
         core_replace_atom_coords = core_coordinates[core_replace_atom].round(4)
@@ -76,12 +89,12 @@ for decoration in input_data['decorations']:
             print(f"Running Decoration Nº {decoration_i}.{replacement_i}")
             print(f"Original core atom number: {core_replace_atom+1}, Updated core atom number: {core_replace_atom_+1}")
             xyz_file = build_xyz_file(core_elements_, core_coordinates_)
-            with open(f'd{decoration_i}rep{replacement_i}-0.xyz', mode='w') as f:
+            with open(f'd{decoration_i}r{replacement_i}-0.xyz', mode='w') as f:
                 f.write(xyz_file)
 
         # check if core is a terminal-type replacement
         # if not, remove all neighbours of the replacement point (except for core and core-neighbours)
-        core_neighbours = np.array(find_neighbors(core_adj_matrix_, core_replace_atom_, excluded_atoms=core_atoms_))
+        core_neighbours = np.array(find_neighbors(core_adj_matrix_, core_replace_atom_, excluded_atoms=ignore_atoms_))
         core_neighbours = np.delete(core_neighbours, np.where(core_neighbours == core_replace_atom_))
 
         if len(core_neighbours) > 0:
@@ -99,7 +112,7 @@ for decoration in input_data['decorations']:
 
         if args.verbose:
             xyz_file = build_xyz_file(core_elements_, core_coordinates_)
-            with open(f'd{decoration_i}rep{replacement_i}-1.xyz', mode='w') as f:
+            with open(f'd{decoration_i}r{replacement_i}-1.xyz', mode='w') as f:
                 f.write(xyz_file)
             print(f"Core atoms: {core_atoms_+1}")
             print(f"Replace at: {core_replace_atom_+1}")
@@ -253,9 +266,9 @@ for decoration in input_data['decorations']:
                 #         f.write(xyz_file)
                 #     print(f"{rotation} {distances.min()}")
 
-                if (distances > .950).all():
-                    fragments_all.append(fragment_coordinates_)
-                    coordinates_all.append(coordinates_join)
+                if (distances > .965).all():
+                    fragments_all.append(fragment_coordinates_.copy())
+                    coordinates_all.append(coordinates_join.copy())
                 else:
                     continue
 
@@ -301,17 +314,18 @@ for decoration in input_data['decorations']:
         core_elements_ = _[:,0].reshape(-1).astype(np.str_)
         core_coordinates_ = _[:,1:].astype(float)
         core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_elements_)
-        added_fragments_coordinates = np.append(added_fragments_coordinates, best_fragment)
-        #TODO -> keep track of the added ligand coordinates to exclude them from the core neighbours search
+
+        print(best_fragment.shape)
+        added_fragments_coordinates = np.append(added_fragments_coordinates, best_fragment, axis=0)
+        added_fragments_coordinates = added_fragments_coordinates.round(4)
 
         if args.verbose:
-            print(f"The core has been renumbered.\nCurrent core atom numbers:{core_atoms_}")
+            print(f"The core has been renumbered.\nCurrent core atom numbers:{core_atoms_+1}")
 
         if args.verbose:
             xyz_file = build_xyz_file(core_elements_, core_coordinates_)
-            with open(f'd{decoration_i}rep{replacement_i}-2.xyz', mode='w') as f:
+            with open(f'd{decoration_i}r{replacement_i}-2.xyz', mode='w') as f:
                 f.write(xyz_file)
-            print(added_fragments_coordinates)
             print("Decoration done\n\n")
         replacement_i += 1
     decoration_i += 1
