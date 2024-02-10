@@ -315,7 +315,6 @@ for decoration in input_data['decorations']:
         core_coordinates_ = _[:,1:].astype(float)
         core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_elements_)
 
-        print(best_fragment.shape)
         added_fragments_coordinates = np.append(added_fragments_coordinates, best_fragment, axis=0)
         added_fragments_coordinates = added_fragments_coordinates.round(4)
 
