@@ -62,6 +62,7 @@ core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_
 
 # main engine
 decoration_i = 0
+added_fragments_coordinates = np.array([])
 for decoration in input_data['decorations']:
 
     replacement_i = 0
@@ -169,6 +170,7 @@ for decoration in input_data['decorations']:
                         rotatable_bonds = rotatable_bonds_
 
         coordinates_all = []
+        fragments_all = []
         intersection_volume_all = []
         elements_join = np.concatenate([core_elements_, fragment_elements])
 
@@ -252,6 +254,7 @@ for decoration in input_data['decorations']:
                 #     print(f"{rotation} {distances.min()}")
 
                 if (distances > .950).all():
+                    fragments_all.append(fragment_coordinates_)
                     coordinates_all.append(coordinates_join)
                 else:
                     continue
@@ -270,8 +273,8 @@ for decoration in input_data['decorations']:
         intersection_volume_all = np.array(intersection_volume_all)
         optimal_rotation = intersection_volume_all.argmin()
 
-        best_coordinates = coordinates_all[optimal_rotation]
-        best_coordinates += core_translation
+        best_coordinates = coordinates_all[optimal_rotation] + core_translation
+        best_fragment = fragments_all[optimal_rotation] + core_translation
         
         # update core coordinates for the next decoration cycle
         core_elements_ = elements_join
@@ -298,6 +301,7 @@ for decoration in input_data['decorations']:
         core_elements_ = _[:,0].reshape(-1).astype(np.str_)
         core_coordinates_ = _[:,1:].astype(float)
         core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_elements_)
+        added_fragments_coordinates = np.append(added_fragments_coordinates, best_fragment)
         #TODO -> keep track of the added ligand coordinates to exclude them from the core neighbours search
 
         if args.verbose:
@@ -307,6 +311,7 @@ for decoration in input_data['decorations']:
             xyz_file = build_xyz_file(core_elements_, core_coordinates_)
             with open(f'd{decoration_i}rep{replacement_i}-2.xyz', mode='w') as f:
                 f.write(xyz_file)
+            print(added_fragments_coordinates)
             print("Decoration done\n\n")
         replacement_i += 1
     decoration_i += 1
