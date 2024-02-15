@@ -1,7 +1,6 @@
 import numpy as np 
 from math import sin, cos, acos, sqrt
 from util.kabsch import kabsch_algorithm
-from util.graph_tools import find_neighbors
 
 # quaternion rotations
 def normalize(v, tolerance=0.00001):
@@ -72,38 +71,37 @@ def sphere_intersection_volumes(matrix_a, matrix_b, radii_a, radii_b):
 
     return volumes
 
-def rotate_dihedral(atom1, atom2, coordinates, adj_matrix, rad):
-    z_axis = np.array([0,0,1])
+def rmsd(matrix1, matrix2):
+    # Flatten matrices and align them based on their centroids
+    centroid1 = np.mean(matrix1, axis=0)
+    centroid2 = np.mean(matrix2, axis=0)
+    matrix1 -= centroid1
+    matrix2 -= centroid2
 
-    # translate atom 1 (fixed) to origin
-    translation = coordinates[atom1].copy()
-    coordinates -= translation
-    # align the bond to z-axis
-    bond_axis = coordinates[atom1] - coordinates[atom2]
-    R, t = kabsch_algorithm(
-        bond_axis.reshape(3,-1),
-        z_axis.reshape(3,-1),
+    # Calculate the optimal rotation matrix using Singular Value Decomposition (SVD)
+    rotation_matrix, t = kabsch_algorithm(
+        matrix2.reshape(3,-1),
+        matrix1.reshape(3,-1),
         center=False
     )
-    coordinates = (R @ coordinates.T).T
-    # rotate atoms bonded to atom2
-    atoms_to_rotate = find_neighbors(adj_matrix, atom_number=atom2, excluded_atoms=[atom1])
-    atoms_fixed = list(set([i for i in range(len(coordinates))]).difference(set(atoms_to_rotate)))
-    
-    coords_rotated = coordinates.copy()
-    for i in atoms_fixed:
-        coords_rotated[i] = np.array([0.,0.,0.])
 
-    quat = axisangle_to_q(z_axis, rad)
-    for i, atom_coordinates in enumerate(coords_rotated):
-        new_coordinates = qv_mult(quat, tuple(atom_coordinates))
-        coords_rotated[i] = new_coordinates
+    # Apply the rotation to matrix1 and calculate the RMSD
+    transformed_matrix1 = (rotation_matrix @ matrix1.T).T
+    rmsd_value = np.sqrt(np.mean(np.square(transformed_matrix1 - matrix2)))
 
-    for i in atoms_to_rotate:
-        coordinates[i] = coords_rotated[i]
+    return rmsd_value
 
-    # undo rotation and translation
-    coordinates = (R.T @ coordinates.T).T
-    coordinates += translation
+def rmsd_matrix(matrices):
+    num_matrices = len(matrices)
+    rmsd_matrix = np.zeros((num_matrices, num_matrices))
 
-    return coordinates
+    for i in range(num_matrices):
+        for j in range(i):  # Only calculate the lower triangular part
+            rmsd_matrix[i, j] = rmsd(matrices[i], matrices[j])
+
+    return rmsd_matrix
+
+def get_duplicates_rmsd_matrix(matrix, threshold=0.25):
+    analysis = np.logical_and(matrix > 0, matrix <= threshold)
+    to_delete = np.unique(np.where(analysis)[0])
+    return to_delete

@@ -9,11 +9,10 @@ from rdkit import Chem
 from rdkit.Chem import rdDetermineBonds
 from scipy.spatial.distance import pdist
 
-from util.geometry import rotate_dihedral
 from util.graph_tools import find_neighbors
-from util.xyz_tools import build_xyz_file, reorder_xyz
+from util.xyz_tools import build_xyz_file, reorder_xyz, rotate_dihedral, get_conformers
 from util.kabsch import kabsch_algorithm
-from util.geometry import axisangle_to_q, qv_mult, sphere_intersection_volumes
+from util.geometry import axisangle_to_q, qv_mult, sphere_intersection_volumes,rmsd_matrix, get_duplicates_rmsd_matrix
 
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -61,6 +60,62 @@ core_atoms_ = fixed_core
 core_elements_ = _[:,0].reshape(-1).astype(np.str_)
 core_coordinates_ = _[:,1:].astype(float)
 core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_elements_)
+
+# process each given ligand and make a library of the resulting data
+fragments_filepaths = []
+for decoration in input_data['decorations']:
+    fragments_filepaths.append(decoration['fragment'])
+
+if args.verbose:
+    print("Will generate conformers for the fragments")
+
+fragments_data = dict.fromkeys(fragments_filepaths)
+for fragment_path in fragments_data.keys():
+    fragments_data[fragment_path] = {}
+
+    fragments_data[fragment_path]['fragment_elements'], fragments_data[fragment_path]['fragment_coordinates'] = morfeus.read_xyz(fragment_path)
+    fragments_data[fragment_path]['fragment_adj_matrix'] = morfeus.utils.get_connectivity_matrix(
+        fragments_data[fragment_path]['fragment_coordinates'], fragments_data[fragment_path]['fragment_elements']
+    )
+    
+    fragments_data[fragment_path]['fragment_mol'] = Chem.rdmolfiles.MolFromXYZFile(fragment_path)
+    rdDetermineBonds.DetermineConnectivity(fragments_data[fragment_path]['fragment_mol'])
+    rdDetermineBonds.DetermineBondOrders(fragments_data[fragment_path]['fragment_mol'], charge=0)
+    fragments_data[fragment_path]['rotatable_bonds'] = fragments_data[fragment_path]['fragment_mol'].GetSubstructMatches(RotatableBond)
+
+    if args.verbose:
+        print(f"Processing fragment {fragment_path}")
+        print("The following bonds will be rotated")
+        _ = np.array(fragments_data[fragment_path]['rotatable_bonds'])
+        print(_+1)
+
+    conformers = get_conformers(
+        coordinates = fragments_data[fragment_path]['fragment_coordinates'],
+        adjacency_matrix = fragments_data[fragment_path]['fragment_adj_matrix'],
+        rotatable_bonds = fragments_data[fragment_path]['rotatable_bonds'],
+        numconfs=250,
+        threshold=0.960
+    )
+
+    if args.verbose:
+        print(f"Number of conformers: {len(conformers)}")
+        with open(f"tmp.{fragment_path.replace('.xyz', '.conformers.xyz')}", mode='a') as f:
+            for coordinates in conformers:
+                xyz_file = build_xyz_file(fragments_data[fragment_path]['fragment_elements'], coordinates)
+                f.write(xyz_file)
+
+    rmsd_distance_matrix = rmsd_matrix(conformers)
+    to_delete = get_duplicates_rmsd_matrix(rmsd_distance_matrix, threshold=0.30)
+    conformers = [conformers[i] for i in range(len(conformers)) if i not in to_delete]
+
+    if args.verbose:
+        print(f"Remaining conformers after deduplication: {len(conformers)}")
+        with open(f"tmp.{fragment_path.replace('.xyz', '.conformers.clear.xyz')}", mode='a') as f:
+            for coordinates in conformers:
+                xyz_file = build_xyz_file(fragments_data[fragment_path]['fragment_elements'], coordinates)
+                f.write(xyz_file)
+    
+    fragments_data[fragment_path]['conformers'] = conformers
 
 # # main engine
 # decoration_i = 0

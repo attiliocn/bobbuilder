@@ -1,4 +1,9 @@
 import numpy as np
+from scipy.spatial.distance import pdist
+
+from util.kabsch import kabsch_algorithm
+from util.graph_tools import find_neighbors
+from util.geometry import axisangle_to_q, qv_mult
 
 def build_xyz_file(elements, coordinates):
     elements = elements.reshape(-1,1)
@@ -42,3 +47,52 @@ def reorder_xyz(xyz_matrix, src_numbering, dest_numbering):
                 modified_matrix[dest] = xyz_matrix[src]
             
             return modified_matrix
+
+def rotate_dihedral(atom1, atom2, coordinates, adj_matrix, rad):
+    z_axis = np.array([0,0,1])
+
+    # translate atom 1 (fixed) to origin
+    translation = coordinates[atom1].copy()
+    coordinates -= translation
+    # align the bond to z-axis
+    bond_axis = coordinates[atom1] - coordinates[atom2]
+    R, t = kabsch_algorithm(
+        bond_axis.reshape(3,-1),
+        z_axis.reshape(3,-1),
+        center=False
+    )
+    coordinates = (R @ coordinates.T).T
+    # rotate atoms bonded to atom2
+    atoms_to_rotate = find_neighbors(adj_matrix, atom_number=atom2, excluded_atoms=[atom1])
+    atoms_fixed = list(set([i for i in range(len(coordinates))]).difference(set(atoms_to_rotate)))
+    
+    coords_rotated = coordinates.copy()
+    for i in atoms_fixed:
+        coords_rotated[i] = np.array([0.,0.,0.])
+
+    quat = axisangle_to_q(z_axis, rad)
+    for i, atom_coordinates in enumerate(coords_rotated):
+        new_coordinates = qv_mult(quat, tuple(atom_coordinates))
+        coords_rotated[i] = new_coordinates
+
+    for i in atoms_to_rotate:
+        coordinates[i] = coords_rotated[i]
+
+    # undo rotation and translation
+    coordinates = (R.T @ coordinates.T).T
+    coordinates += translation
+
+    return coordinates
+
+def get_conformers(coordinates, adjacency_matrix, rotatable_bonds, numconfs=500, threshold=.950):
+    conformers = []
+    for _ in range(numconfs):
+            rotation_angles = np.random.uniform(np.radians(-180), np.radians(180), len(rotatable_bonds))
+            rot = coordinates.copy()
+            for bond, angle in zip(rotatable_bonds, rotation_angles):
+                rot = rotate_dihedral(bond[0], bond[1], rot, adjacency_matrix, angle)
+            distances = pdist(rot, 'euclidean')
+            if (distances > threshold).all():
+                conformers.append(rot)
+    return conformers
+
