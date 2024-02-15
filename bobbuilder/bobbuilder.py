@@ -251,6 +251,7 @@ for decoration in input_data['decorations']:
             rotation_steps = 50
             rotation_stepsize_rad = np.radians(360) / rotation_steps
 
+            all_distances = np.array([])
             for rotation in range(rotation_steps-1):
                 quat = axisangle_to_q(core_axis, rotation_stepsize_rad)
                 for i, atom_coordinates in enumerate(fragment_coordinates_):
@@ -264,12 +265,17 @@ for decoration in input_data['decorations']:
                 #     xyz_file = build_xyz_file(elements_join, coordinates_join)
                 #     with open(f'd{decoration_i}r{replacement_i}_rotations.xyz', mode='a') as f:
                 #         f.write(xyz_file)
-                #     print(f"{rotation} {distances.min()}")
 
-                if (distances > .965).all():
+                if (distances > .970).all():
+                    all_distances = np.append(all_distances, distances.min())
                     fragments_all.append(fragment_coordinates_.copy())
                     coordinates_all.append(coordinates_join.copy())
+                # elif (distances > .950).all():
+                #     all_distances = np.append(all_distances, distances.min())
+                #     fragments_all.append(fragment_coordinates_.copy())
+                #     coordinates_all.append(coordinates_join.copy())
                 else:
+                    all_distances = np.append(all_distances, distances.min())
                     continue
 
                 intersection_volumes = sphere_intersection_volumes(
@@ -282,7 +288,8 @@ for decoration in input_data['decorations']:
                 intersection_volume_all.append(intersection_volume)
 
         if args.verbose:
-            print(f"No of valid geometries {len(coordinates_all)}")
+            print(f"Minimal interdistance found by rotations: {all_distances.min().round(4)}")
+            print(f"No of valid geometries: {len(coordinates_all)}")
         intersection_volume_all = np.array(intersection_volume_all)
         optimal_rotation = intersection_volume_all.argmin()
 
