@@ -1,4 +1,4 @@
-def find_neighbors(adjacency_matrix, atom_number, visited=None, excluded_atoms=None):
+def find_neighbors(adjacency_matrix, atom_number, visited=None, excluded_atoms=None, recursive=True):
     """0-indexed"""
     
     if visited is None:
@@ -16,8 +16,13 @@ def find_neighbors(adjacency_matrix, atom_number, visited=None, excluded_atoms=N
     neighbors = [neighbor for neighbor in neighbors if neighbor not in excluded_atoms]
 
     # Recursively find neighbors of neighbors
-    for neighbor in neighbors:
-        if neighbor not in visited:
-            find_neighbors(adjacency_matrix, neighbor, visited, excluded_atoms)
+    if recursive:
+        for neighbor in neighbors:
+            if neighbor not in visited:
+                find_neighbors(adjacency_matrix, neighbor, visited, excluded_atoms)
+    else:
+        return neighbors
 
     return list(visited)
+
+#TODO -> refactor this function!
