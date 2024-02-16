@@ -105,14 +105,21 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
             print("Fragment will be deprotonated")
 
         for i, atom in enumerate(fragment_connecting_atoms):
-            if fragment_elements[atom] in ['C', 'O', 'N', 'S']:
+            if decoration['make terminal'] == True:
                 _neighbours = find_neighbors(
-                    fragment_adj_matrix, atom, excluded_atoms=decoration['bond axis atoms']
+                    fragment_adj_matrix, atom, excluded_atoms=decoration['bond axis atoms'],
+                    recursive=True
                     )
-                _neighbours = np.array(_neighbours)
-                _neighbours = np.delete(_neighbours, np.where(_neighbours == atom))
+            elif decoration['make terminal'] == False:
+                _neighbours = find_neighbors(
+                    fragment_adj_matrix, atom, excluded_atoms=decoration['bond axis atoms'],
+                    recursive=False
+                    )
+            _neighbours = np.array(_neighbours)
+            _neighbours = np.delete(_neighbours, np.where(_neighbours == atom))
 
-                for neighbour in _neighbours:
+            for neighbour in _neighbours:
+                if fragment_elements[neighbour] == 'H' or decoration['make terminal'] == True:
                     if args.verbose:
                         print(f"Neighbour {neighbour+1} of atom {atom+1} will be deleted")
                     fragment_coordinates = np.delete(fragment_coordinates, neighbour, axis=0)
@@ -126,8 +133,7 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
                     rotatable_bonds = _rotatable_bonds.copy()
                     if decoration['make terminal'] == False:
                         break
-                    elif decoration['make terminal'] == True:
-                        continue
+
         if args.verbose:
             print(f"Updated rotatable bonds for fragment {fragment_path}:")
             print(np.array(rotatable_bonds)+1)
@@ -255,6 +261,7 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
             # remove the core atom
             _core_coordinates = np.delete(_core_coordinates, core_replace_atom_, axis=0)
             _core_elements = np.delete(core_elements_, core_replace_atom_)
+            # TODO -> Add an option to keep the core atom and delete the fragment atom instead
             
             # join core elements with fragment elements
             elements_join = np.concatenate([_core_elements, fragment_elements_])
@@ -353,3 +360,8 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
             with open(f'tmp.decor{decoration_i}-{replacement_i}_core2.xyz', mode='w') as f:
                 f.write(xyz_file)
         print("Decoration done\n\n")
+
+if not args.verbose:
+    xyz_file = build_xyz_file(core_elements_, core_coordinates_)
+    with open(f'rotation.xyz', mode='w') as f:
+        f.write(xyz_file)
