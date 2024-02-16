@@ -96,6 +96,7 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
     if args.verbose:
         print(f"Current rotatable bonds for fragment {fragment_path}:")
         print(np.array(rotatable_bonds)+1)
+        print(f"Number of rotatable bonds: {len(rotatable_bonds)}")
     
     # run the deprotonate procedure
     if decoration['deprotonate'] == True:
@@ -130,12 +131,13 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
         if args.verbose:
             print(f"Updated rotatable bonds for fragment {fragment_path}:")
             print(np.array(rotatable_bonds)+1)
+            print(f"Number of rotatable bonds: {len(rotatable_bonds)}")
     
     fragment_conformers = get_conformers(
         coordinates = fragment_coordinates,
         adjacency_matrix = fragment_adj_matrix,
         rotatable_bonds = rotatable_bonds,
-        numconfs=250,
+        numconfs=(len(fragment_coordinates)*len(rotatable_bonds)),
         threshold=0.960
     )
 
@@ -160,10 +162,7 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
     for replacement_i, core_replace_atom in enumerate(decoration['replace at']):
         if args.verbose:
             print(f"Running replacement {decoration_i}.{replacement_i}")
-
-
-    ########################### working here
-            
+          
     # map added coordinates to actual atom numbers
     if replacement_i > 0:
         for coordinate in added_fragments_coordinates:
