@@ -147,6 +147,8 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
         threshold=.960
     )
 
+    fragment_conformers.append(fragment_coordinates)
+
     if args.verbose:
         print(f"Number of conformers: {len(fragment_conformers)}")
         with open(f"tmp.decor{decoration_i}.confs0.xyz", mode='w') as f:
