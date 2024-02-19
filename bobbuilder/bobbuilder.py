@@ -361,7 +361,7 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
             xyz_file = build_xyz_file(core_elements_, core_coordinates_)
             with open(f'tmp.decor{decoration_i}-{replacement_i}_core2.xyz', mode='w') as f:
                 f.write(xyz_file)
-        print("Decoration done\n\n")
+            print("Decoration done\n\n")
 
 if not args.verbose:
     xyz_file = build_xyz_file(core_elements_, core_coordinates_)
