@@ -159,7 +159,7 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
         coordinates = fragment_coordinates,
         adjacency_matrix = fragment_adj_matrix,
         rotatable_bonds = rotatable_bonds,
-        numconfs=(len(fragment_coordinates)*len(rotatable_bonds)),
+        numconfs=(len(fragment_coordinates)*len(rotatable_bonds)*2),
         threshold=.960
     )
 
@@ -173,7 +173,7 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
                 f.write(xyz_file)
 
     rmsd_distance_matrix = rmsd_matrix(fragment_conformers)
-    to_delete = get_duplicates_rmsd_matrix(rmsd_distance_matrix, threshold=0.30)
+    to_delete = get_duplicates_rmsd_matrix(rmsd_distance_matrix, threshold=0.55)
     fragment_conformers = [fragment_conformers[i] for i in range(len(fragment_conformers)) if i not in to_delete]
 
     if args.verbose:
@@ -281,7 +281,7 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
             # rotate the fragment 360 degrees about the fragment axis
             # find the optimal positioning for the rigid fragment
             # by reducing the vdW spheres superposition
-            rotation_steps = 100
+            rotation_steps = 15
             rotation_stepsize_rad = np.radians(360) / rotation_steps
 
             for rotation in range(rotation_steps-1):
@@ -289,12 +289,13 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
                 for i, atom_coordinates in enumerate(fragment_coordinates_):
                     new_coordinates = qv_mult(quat, tuple(atom_coordinates))
                     fragment_coordinates_[i] = new_coordinates
-
                 coordinates_join = np.vstack([_core_coordinates, fragment_coordinates_])
+
                 distances = pdist(coordinates_join, 'euclidean')
 
                 coordinates_without_H = coordinates_join[np.where(elements_join != 'H')[0]]
                 distances_without_H = pdist(coordinates_without_H)
+
                 if distances_without_H.min() < 1.20:
                     continue
                 else: 
@@ -306,6 +307,7 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
         threshold_950 = (all_distances >= .950)
         threshold_890 = (all_distances >= .850)
         if args.verbose:
+            print(f"Total geometries: {len(all_distances)}")
             print(f"Number of valid geometries (.955 threshold): {threshold_955.sum()}")
             print(f"Number of valid geometries (.950 threshold): {threshold_950.sum()}")
             print(f"Number of valid geometries (.850 threshold): {threshold_890.sum()}")
@@ -342,6 +344,10 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
             
         intersection_volume_all = np.array(intersection_volume_all)
         optimal_rotation = intersection_volume_all.argmin()
+
+        if args.verbose:
+            print(f"Best Rotation Intersection Volume: {intersection_volume_all.min().round(1)}")
+            print(f"Worst Rotation Intersection Volume: {intersection_volume_all.max().round(1)}")
 
         best_coordinates = coordinates_all[optimal_rotation] + core_translation
         best_fragment = fragments_all[optimal_rotation] + core_translation
