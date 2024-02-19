@@ -73,6 +73,22 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
         print("{:#^25}".format(f" DECORATION {decoration_i} "))
 
     current_decoration = {}
+
+    # map added coordinates to actual atom numbers
+    if decoration_i > 0:
+        for coordinate in added_fragments_coordinates:
+            atom_number = np.where(np.all(core_coordinates_.round(4) == coordinate, axis=1))[0][0]
+            added_fragments_atom_numbers = np.append(added_fragments_atom_numbers, atom_number)
+        ignore_atoms_ = np.append(core_atoms_, added_fragments_atom_numbers)
+
+        if args.verbose:
+            print(f"New atoms added at positions: {added_fragments_atom_numbers+1}\n")
+            print(f"Current atoms to ignore: {ignore_atoms_+1}")
+        
+    else:
+        ignore_atoms_ = core_atoms_.copy()
+        if args.verbose:
+            print(f"Current atoms to ignore: {ignore_atoms_+1}")
     
     if args.verbose:
         print(f"Processing fragment {decoration['fragment']} of decoration {decoration_i}")
@@ -171,19 +187,6 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
     for replacement_i, core_replace_atom in enumerate(decoration['replace at']):
         if args.verbose:
             print(f"Running replacement {decoration_i}.{replacement_i}")
-          
-        # map added coordinates to actual atom numbers
-        if replacement_i > 0:
-            for coordinate in added_fragments_coordinates:
-                atom_number = np.where(np.all(core_coordinates_.round(4) == coordinate, axis=1))[0][0]
-                added_fragments_atom_numbers = np.append(added_fragments_atom_numbers, atom_number)
-            ignore_atoms_ = np.append(core_atoms_, added_fragments_atom_numbers)
-
-            if args.verbose:
-                print(f"New atoms added at positions: {added_fragments_atom_numbers+1}\n")
-            
-        else:
-            ignore_atoms_ = core_atoms_.copy()
 
         # map current core_replace_atom to the actual core atom number
         core_replace_atom_coords = core_coordinates[core_replace_atom].round(4)
@@ -197,6 +200,8 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
 
         # check if core is a terminal-type replacement
         # if not, remove all neighbours of the replacement point (except for core and core-neighbours)
+        # TODO -> adjust every occurence of adj_matrix updates
+        core_adj_matrix_ = morfeus.utils.get_connectivity_matrix(core_coordinates_,core_elements_)
         core_neighbours = np.array(find_neighbors(core_adj_matrix_, core_replace_atom_, excluded_atoms=ignore_atoms_))
         core_neighbours = np.delete(core_neighbours, np.where(core_neighbours == core_replace_atom_))
 
