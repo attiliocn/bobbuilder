@@ -220,6 +220,25 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
             print(f"Core atoms: {core_atoms_+1}")
             print(f"Replace at: {core_replace_atom_+1}")
 
+        # translate core to origin
+        core_translation = core_coordinates_[core_replace_atom_].copy()
+        _core_coordinates = core_coordinates_.copy()
+        _core_coordinates -= core_translation
+        #identify the core-axis
+        # TODO -> clean up these disgusting workarounds for adj_matrix recalculations
+        _core_adj_matrix = morfeus.utils.get_connectivity_matrix(_core_coordinates,core_elements_)
+        if len(np.where(_core_adj_matrix[core_replace_atom_] == 1)[0]) == 0:
+            axis_point2_atom = 0
+        else:
+            axis_point2_atom = np.where(_core_adj_matrix[core_replace_atom_] == 1)[0][0]
+        core_axis = _core_coordinates[core_replace_atom_] - _core_coordinates[axis_point2_atom]
+        if args.verbose:
+            print(f"Current core-axis atoms: {core_replace_atom_+1} -> {axis_point2_atom+1}")
+            print(f"Current fragment-axis atoms: {fragment_connecting_atoms+1} -> {fragment_bond_axis_atoms+1}")
+        # remove the core atom
+        _core_coordinates = np.delete(_core_coordinates, core_replace_atom_, axis=0)
+        _core_elements = np.delete(core_elements_, core_replace_atom_)
+
         coordinates_all = []
         fragments_all = []
         intersection_volume_all = []
@@ -231,17 +250,8 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
             fragment_coordinates_ = frag_conf_coordinates.copy()
             fragment_elements_ = fragment_elements.copy()
 
-            # translate core to origin
-            core_translation = core_coordinates_[core_replace_atom_].copy()
-            _core_coordinates = core_coordinates_.copy()
-            _core_coordinates -= core_translation
-
             # translate fragment to origin
             fragment_coordinates_ -= fragment_coordinates_[fragment_connecting_atoms]
-
-            #identify the core-axis
-            axis_point2_atom = np.where(core_adj_matrix_[core_replace_atom_] == 1)[0][0]
-            core_axis = _core_coordinates[core_replace_atom_] - _core_coordinates[axis_point2_atom]
 
             # set fragment axis coordinates
             # len(axis) = 1, take the coordinates of this atom
@@ -259,12 +269,7 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
                 center=False
             )
             fragment_coordinates_ = (R @ fragment_coordinates_.T).T
-            
-            # remove the core atom
-            _core_coordinates = np.delete(_core_coordinates, core_replace_atom_, axis=0)
-            _core_elements = np.delete(core_elements_, core_replace_atom_)
-            # TODO -> Add an option to keep the core atom and delete the fragment atom instead
-            
+                        
             # join core elements with fragment elements
             elements_join = np.concatenate([_core_elements, fragment_elements_])
 
@@ -283,17 +288,22 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
                 coordinates_join = np.vstack([_core_coordinates, fragment_coordinates_])
                 distances = pdist(coordinates_join, 'euclidean')
 
-                all_distances = np.append(all_distances, distances.min())
-                fragments_all.append(fragment_coordinates_.copy())
-                coordinates_all.append(coordinates_join.copy())
+                coordinates_without_H = coordinates_join[np.where(elements_join != 'H')[0]]
+                distances_without_H = pdist(coordinates_without_H)
+                if distances_without_H.min() < 1.20:
+                    continue
+                else: 
+                    all_distances = np.append(all_distances, distances.min())
+                    fragments_all.append(fragment_coordinates_.copy())
+                    coordinates_all.append(coordinates_join.copy())
 
         threshold_955 = (all_distances >= .955)
         threshold_950 = (all_distances >= .950)
-        threshold_890 = (all_distances >= .890)
+        threshold_890 = (all_distances >= .850)
         if args.verbose:
             print(f"Number of valid geometries (.955 threshold): {threshold_955.sum()}")
             print(f"Number of valid geometries (.950 threshold): {threshold_950.sum()}")
-            print(f"Number of valid geometries (.890 threshold): {threshold_890.sum()}")
+            print(f"Number of valid geometries (.850 threshold): {threshold_890.sum()}")
         if threshold_955.sum() > 0:
             coordinates_all = [coordinates_all[i] for i in np.where(threshold_955)[0]]
             fragments_all = [fragments_all[i] for i in np.where(threshold_955)[0]]
@@ -309,6 +319,12 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
                     print(f"Threshold: {threshold.round(3):.3f} => {(all_distances >= threshold).sum()} valid geometries")
             raise ValueError("Impossible to fit this ligand")
         
+        if args.verbose:
+            with open(f"tmp.decor{decoration_i}-{replacement_i}.confs.xyz", mode='w') as f:
+                for coordinates in coordinates_all:
+                    xyz_file = build_xyz_file(elements_join, coordinates)
+                    f.write(xyz_file)
+
         for fragment_coordinates_ in fragments_all:
             intersection_volumes = sphere_intersection_volumes(
                 _core_coordinates,
