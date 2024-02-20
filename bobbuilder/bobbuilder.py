@@ -296,7 +296,7 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
                 coordinates_without_H = coordinates_join[np.where(elements_join != 'H')[0]]
                 distances_without_H = pdist(coordinates_without_H)
 
-                if distances_without_H.min() < 1.20:
+                if distances_without_H.min() < 1.15:
                     continue
                 else: 
                     all_distances = np.append(all_distances, distances.min())
