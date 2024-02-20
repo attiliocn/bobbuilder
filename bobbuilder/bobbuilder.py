@@ -324,6 +324,10 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
             if args.verbose:
                 for threshold in np.arange(0.740,0.955,0.005):
                     print(f"Threshold: {threshold.round(3):.3f} => {(all_distances >= threshold).sum()} valid geometries")
+                with open(f"tmp.decor{decoration_i}-{replacement_i}.failed.confs.xyz", mode='w') as f:
+                    for coordinates in coordinates_all:
+                        xyz_file = build_xyz_file(elements_join, coordinates)
+                        f.write(xyz_file)
             raise ValueError("Impossible to fit this ligand")
         
         if args.verbose:
@@ -360,7 +364,7 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
         # then remap core to 1,...,n atom numbers again
         current_core_atoms = []
         for atom_idx in core_atoms:
-            atom_coords = core_coordinates[atom_idx].round(4)
+            atom_coords = core_coordinates_[atom_idx].round(4)
             atom_idx_updated = np.where(np.all(core_coordinates_.round(4) == atom_coords, axis=1))[0][0]
             current_core_atoms.append(atom_idx_updated)
         current_core_atoms = np.array(current_core_atoms)
