@@ -362,15 +362,21 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
 
         # identify current core atom numbers
         # then remap core to 1,...,n atom numbers again
+        if args.verbose:
+            print(f"Current core atom numbers: {core_atoms_+1}")
+            xyz_file = build_xyz_file(core_elements_, core_coordinates_)
+            with open(f'tmp.decor{decoration_i}-{replacement_i}_core2.xyz', mode='w') as f:
+                f.write(xyz_file)
+
         current_core_atoms = []
         for atom_idx in core_atoms:
-            atom_coords = core_coordinates_[atom_idx].round(4)
+            atom_coords = core_coordinates[atom_idx].round(4)
             atom_idx_updated = np.where(np.all(core_coordinates_.round(4) == atom_coords, axis=1))[0][0]
             current_core_atoms.append(atom_idx_updated)
         current_core_atoms = np.array(current_core_atoms)
         
         if args.verbose:
-            print(f"Current core atom numbers: {current_core_atoms+1}")
+            print(f"Identified core atom numbers: {current_core_atoms+1}")
 
         _ = reorder_xyz(
             np.concatenate([core_elements_.reshape(-1,1), core_coordinates_.reshape(-1,3)], axis=1),
@@ -390,7 +396,7 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
 
         if args.verbose:
             xyz_file = build_xyz_file(core_elements_, core_coordinates_)
-            with open(f'tmp.decor{decoration_i}-{replacement_i}_core2.xyz', mode='w') as f:
+            with open(f'tmp.decor{decoration_i}-{replacement_i}_core3.xyz', mode='w') as f:
                 f.write(xyz_file)
             print("Decoration done\n\n")
 
