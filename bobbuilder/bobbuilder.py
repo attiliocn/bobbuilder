@@ -136,14 +136,27 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
 
             if args.verbose:
                 print(f"Found neighbours of atom {atom+1}: {_neighbours+1}")
-                
-            for neighbour in _neighbours:
+
+            deleted_neighbours = np.array([])
+            for i, neighbour in enumerate(_neighbours):
+                _ = neighbour.copy()
+                if (neighbour > deleted_neighbours[:i]).any():
+                        neighbour -= i
+                        if args.verbose:
+                            print(f"Neighbour atom number updated from {_+1} to {neighbour+1}")
                 if fragment_elements[neighbour] == 'H' or decoration['make terminal'] == True:
                     if args.verbose:
                         print(f"Neighbour {neighbour+1} of atom {atom+1} will be deleted")
+
                     fragment_coordinates = np.delete(fragment_coordinates, neighbour, axis=0)
                     fragment_elements = np.delete(fragment_elements, neighbour, axis=0)
                     fragment_adj_matrix = morfeus.utils.get_connectivity_matrix(fragment_coordinates,fragment_elements)
+
+                    deleted_neighbours = np.append(deleted_neighbours, _)
+                    if args.verbose:
+                        print(f"Atom {neighbour+1} deleted")
+                        print(f"Current deleted atoms: {deleted_neighbours+1}")
+                    
                     if atom > neighbour:
                         fragment_connecting_atoms[i] -= 1
                         fragment_bond_axis_atoms -= 1
