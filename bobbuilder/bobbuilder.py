@@ -134,6 +134,9 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
             _neighbours = np.array(_neighbours)
             _neighbours = np.delete(_neighbours, np.where(_neighbours == atom))
 
+            if args.verbose:
+                print(f"Found neighbours of atom {atom+1}: {_neighbours+1}")
+                
             for neighbour in _neighbours:
                 if fragment_elements[neighbour] == 'H' or decoration['make terminal'] == True:
                     if args.verbose:
