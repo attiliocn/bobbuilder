@@ -44,6 +44,9 @@ core_elements, core_coordinates = morfeus.read_xyz(core_file)
 core_mol = Chem.rdmolfiles.MolFromXYZFile(core_file)
 rdDetermineBonds.DetermineConnectivity(core_mol)
 
+# round core coordinates to 4 decimal places
+core_coordinates = core_coordinates.round(4)
+
 # rdkit smarts pattern for rotatable bondss
 RotatableBond = Chem.MolFromSmarts('[!$(*#*)&!D1]-&!@[!$(*#*)&!D1]')
 
