@@ -394,8 +394,8 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
                 print(f"Atom (original number): {atom_idx+1} -> {atom_coords}")
             atom_idx_updated = np.where(np.all(core_coordinates_.round(4) == atom_coords, axis=1))[0][0]
             if args.verbose:
-                print(f"  New number -> {atom_idx_updated}")
-            current_core_atoms.append(atom_idx_updated+1)
+                print(f"  New number -> {atom_idx_updated+1}")
+            current_core_atoms.append(atom_idx_updated)
         current_core_atoms = np.array(current_core_atoms)
         
         if args.verbose:
