@@ -387,8 +387,12 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
         current_core_atoms = []
         for atom_idx in core_atoms:
             atom_coords = core_coordinates[atom_idx].round(4)
+            if args.verbose:
+                print(f"Atom (original number): {atom_idx+1} -> {atom_coords}")
             atom_idx_updated = np.where(np.all(core_coordinates_.round(4) == atom_coords, axis=1))[0][0]
-            current_core_atoms.append(atom_idx_updated)
+            if args.verbose:
+                print(f"  New number -> {atom_idx_updated}")
+            current_core_atoms.append(atom_idx_updated+1)
         current_core_atoms = np.array(current_core_atoms)
         
         if args.verbose:
