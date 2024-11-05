@@ -425,5 +425,5 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
 
 if not args.verbose:
     xyz_file = build_xyz_file(core_elements_, core_coordinates_)
-    with open(f'{args.input.replace('json','xyz')}', mode='w') as f:
+    with open(args.input.replace('json','xyz'), mode='w') as f:
         f.write(xyz_file)
