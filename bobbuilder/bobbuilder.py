@@ -250,7 +250,16 @@ for decoration_i, decoration in enumerate(input_data['decorations'], 1):
         _core_coordinates -= core_translation
         #identify the core-axis
         # TODO -> clean up these disgusting workarounds for adj_matrix recalculations
-        _core_adj_matrix = morfeus.utils.get_connectivity_matrix(_core_coordinates,core_elements_)
+
+        # IMPORTANT -> The scale_factor for this connectivity below should be higher than the default of 1.2
+        # that is because C-H bonds should be streched in the template, otherwise bobbuilder will crash because
+        # atoms will flag as collisions after decorating. This elongation causes the _core_adj_matrix below report that
+        # such H has no neighbours and thus the core-vector is measured from the H to atom 0, thus 
+        # resulting in distortions to the final decorated molecule
+
+        # TODO -> Fix DISGUSTING workarounds such those described above!
+
+        _core_adj_matrix = morfeus.utils.get_connectivity_matrix(_core_coordinates,core_elements_, scale_factor=1.50)
         if len(np.where(_core_adj_matrix[core_replace_atom_] == 1)[0]) == 0:
             axis_point2_atom = 0
         else:
